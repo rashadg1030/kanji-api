@@ -25,6 +25,7 @@ dependencies:
 - text
 - hxt
 - pretty-simple
+- Spock
 
 library:
   source-dirs: src
