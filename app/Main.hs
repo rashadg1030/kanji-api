@@ -4,7 +4,6 @@ import Lib
 import Web.Spock
 import Web.Spock.Config
 
-
 main :: IO ()
 main = do
     spockCfg <- defaultSpockCfg () PCNoDatabase ()

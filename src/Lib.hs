@@ -13,6 +13,7 @@ import Data.Text (Text, pack)
 import GHC.Generics
 import Text.XML.HXT.Core hiding (app)
 import Text.Pretty.Simple (pPrint) 
+import Control.Monad.IO.Class
 
 -- Kanji Data Type --
 data Kanji = Kanji {
@@ -34,7 +35,10 @@ type Api = SpockM () () () ()
 type ApiAction a = SpockAction () () () a
 
 app :: Api
-app = undefined
+app = do
+    get "kanji" $ do
+        t <- liftIO test
+        json . pack . show $ t
 
 parseXML file = readDocument [ withValidate no, 
                                withRemoveWS yes  -- throw away formating WS
@@ -42,7 +46,7 @@ parseXML file = readDocument [ withValidate no,
 
 test = do 
     kanjis <- runX (parseXML "kanjidic2.xml" >>> getKanjis)
-    pPrint $ take 100 $ kanjis
+    return $ take 1 $ kanjis
 
 atTag tag = deep (isElem >>> hasName tag)
 
