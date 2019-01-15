@@ -6,7 +6,6 @@ module Lib (app) where
 
 import Web.Spock
 import Web.Spock.Config
-
 import Data.Aeson hiding (json)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
@@ -36,24 +35,17 @@ type ApiAction a = SpockAction () () () a
 
 app :: Api
 app = do
-    get "kanji" $ do
-        t <- liftIO test
-        json . pack . show $ t
+        get "kanji" $ do
+           t <- liftIO runParser
+           json . show $ t
 
-parseXML file = readDocument [ withValidate no, 
-                               withRemoveWS yes  -- throw away formating WS
-                             ] file
-
-test = do 
+-- Run Parser --
+runParser :: IO [Kanji] 
+runParser = do 
     kanjis <- runX (parseXML "kanjidic2.xml" >>> getKanjis)
     return $ take 1 $ kanjis
 
-atTag tag = deep (isElem >>> hasName tag)
-
-atAttrVal a v = deep (isElem >>> hasAttrValue a (\x -> x == v))
-
-content = getChildren >>> getText
-
+-- Parser -- 
 getKanjis = atTag "kanjidic2" >>>
     proc root -> do
         char <- atTag "character" -< root 
@@ -74,4 +66,13 @@ getKanjis = atTag "kanjidic2" >>>
             nanori = pack <$> nanori
         }
 
+-- Helper Functions --
+parseXML file = readDocument [ withValidate no, 
+                               withRemoveWS yes  -- throw away formating WS
+                             ] file
 
+atTag tag = deep (isElem >>> hasName tag)
+
+atAttrVal a v = deep (isElem >>> hasAttrValue a (\x -> x == v))
+
+content = getChildren >>> getText
