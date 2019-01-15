@@ -2,7 +2,7 @@
 {-# LANGUAGE Arrows, NoMonomorphismRestriction #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Lib where
+module Lib (app) where
 
 import Web.Spock
 import Web.Spock.Config
@@ -11,7 +11,7 @@ import Data.Aeson hiding (json)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 import GHC.Generics
-import Text.XML.HXT.Core
+import Text.XML.HXT.Core hiding (app)
 import Text.Pretty.Simple (pPrint) 
 
 -- Kanji Data Type --
@@ -28,6 +28,13 @@ data Kanji = Kanji {
 instance ToJSON Kanji
 
 instance FromJSON Kanji
+
+type Api = SpockM () () () ()
+
+type ApiAction a = SpockAction () () () a
+
+app :: Api
+app = undefined
 
 parseXML file = readDocument [ withValidate no, 
                                withRemoveWS yes  -- throw away formating WS
