@@ -23,8 +23,10 @@ dependencies:
 - base >= 4.7 && < 5
 - aeson
 - text
-- hxt
-- pretty-simple
+- monad-logger
+- persistent-postgresql
+- persistent
+- persistent-template
 - Spock
 
 library:
