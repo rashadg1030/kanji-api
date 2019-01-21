@@ -1,34 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-
--- For Database
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Lib (app) where
-
-import Web.Spock
-import Web.Spock.Config
+   
+import Data.Time (UTCTime)
+import Servant.API
 import Data.Aeson hiding (json)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack, unpack)
 import GHC.Generics
 import Control.Monad.IO.Class
-
--- For Database
-import Control.Monad.Logger (LoggingT, runStdoutLoggingT)
-import Database.Persist hiding (get) -- To avoid a naming clash with Web.Spock.get
-import qualified Database.Persist as P         -- We'll be using P.get later for GET /people/<id>.
-import Database.Persist.Postgresql hiding (get)
-import Database.Persist.TH
+import Database.PostgreSQL.Simple
 
 -- Kanji Data Type --
 data Kanji = Kanji {
@@ -62,15 +46,10 @@ instance FromJSON Kanji where
         nanori <- bling <$> o .: "nanori"
         return Kanji{..} 
 
-type Api = SpockM () () () ()
-
-type ApiAction a = SpockAction () () () a
-
 app :: Api
-app = do
-        get "kanji" $ do
-           json . show $ "kanji"
+app = undefined
 
+-- Helper Functions --
 bling :: [Text] -> Text
 bling []     = ""
 bling (x:xs) = x <> "|" <> bling xs
@@ -88,3 +67,6 @@ first' (x, _, _) = x
 gop :: Char -> ([String], String, String) -> ([String], String, String)
 gop c (words, acc, "")           = (words, "", "")
 gop c (words, acc, next@(h2:t2)) = if c == h2 then gop c (words ++ [acc], "", t2) else gop c (words, acc ++ [h2], t2)
+
+--ex1 :: Kanji
+
