@@ -54,6 +54,21 @@ instance FromJSON Kanji where
         nanori <- bling <$> o .: "nanori"
         return Kanji{..} 
 
+-- Get Kanjis from database
+getKanjis :: IO ()
+getKanjis = do
+    secret <- readFile "secret.txt"
+    conn <- connect defaultConnectInfo {
+        connectHost = "kanjidb.postgres.database.azure.com",
+        connectUser = "rashadg1030@kanjidb",
+        connectPassword = secret,
+        connectDatabase = "kanjidb"
+    }
+    return ()
+
+
+
+
 -- Helper Functions --
 bling :: [Text] -> Text
 bling []     = ""
