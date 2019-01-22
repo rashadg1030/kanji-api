@@ -18,19 +18,20 @@ import Servant.Server
 import Data.Aeson hiding (json)
 import Data.Aeson.Types
 import Data.Monoid ((<>))
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack, unpack, takeWhile)
 import Text.Pretty.Simple (pPrint)
 import GHC.Generics
 import Control.Monad.IO.Class
 import Database.PostgreSQL.Simple
 import Network.Wai
 import Network.Wai.Handler.Warp
-
-type KanjiAPI = "kanjis" :> Get '[JSON] [Kanji]
+import GHC.TypeLits
+import Prelude hiding (takeWhile)
 
 -- Kanji Data Type --
+
 data Kanji = Kanji {
-    literal :: Text, -- literal character
+    literal :: Text, -- literal characterlocalhost
     grade :: Int, -- grade of the kanji
     strokes :: Int, -- strokes needed to write kanji
     jaOn :: Text, -- "onyomi" of the kanji
@@ -63,24 +64,42 @@ instance FromJSON Kanji where
 instance ToRow Kanji
 instance FromRow Kanji
 
--- App --
--- app :: IO ()
--- app = do
---     kanjis <- getKanjis 
---     pPrint (toJSON <$> kanjis)
+type KanjiAPI = "kanjis" :> QueryParam "jaon" Text :> Get '[JSON] [Kanji] -- view a particular set of kanjis
+    
+kanjiAPI :: Proxy KanjiAPI
+kanjiAPI = Proxy
+
 main' :: IO ()
 main' = run 8080 app
 
 app :: Application
-app = serve kanjiAPI server1
+app = serve kanjiAPI server
 
-server1 :: Server KanjiAPI
-server1 = do
-    kanjis <- liftIO getKanjis
-    return kanjis
+server :: Server KanjiAPI
+server = handler2
 
-kanjiAPI :: Proxy KanjiAPI
-kanjiAPI = Proxy
+-- handler1 :: Handler [Kanji]
+-- handler1 = liftIO getKanjis
+
+handler2 :: Maybe Text -> Handler [Kanji]
+handler2 mtext = case mtext of 
+    Nothing     -> liftIO $ getKanjis
+    (Just jaon) -> do
+        kanjis <- liftIO $ getKanjis 
+        return $ (filter (hasJaOn jaon) kanjis)  
+
+tst :: IO ()
+tst = do
+    kanjis <- getKanjis
+    let flt = filter (hasJaOn "ア") kanjis
+    pPrint flt 
+
+hasJaOn :: Text -> Kanji -> Bool
+hasJaOn t = elem t . (noOkuri <$>) . strip . jaOn
+
+noOkuri :: Text -> Text
+noOkuri "" = ""
+noOkuri t  = takeWhile ('.'/=) t
 
 -- Get Kanjis from database
 getKanjis :: IO [Kanji]
@@ -92,7 +111,7 @@ getKanjis = do
         connectPassword = secret,
         connectDatabase = "kanjidb"
     }
-    kanjis <- (query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from testTbl") -- don't need parentheses!!
+    kanjis <- (query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from kanjiTbl") -- don't need parentheses!!
     return kanjis
 
 -- Helper Functions --
@@ -107,12 +126,11 @@ strip = (pack <$>) . (splitWhere '|') . unpack
             splitWhere _ "" = []
             splitWhere c s = first' $ gop c ([], "", s)
 
-first' :: (a, b, c) -> a
-first' (x, _, _) = x
+            first' :: (a, b, c) -> a
+            first' (x, _, _) = x
 
-gop :: Char -> ([String], String, String) -> ([String], String, String)
-gop c (words, acc, "")           = (words, "", "")
-gop c (words, acc, next@(h2:t2)) = if c == h2 then gop c (words ++ [acc], "", t2) else gop c (words, acc ++ [h2], t2)
+            gop :: Char -> ([String], String, String) -> ([String], String, String)
+            gop c (words, acc, "")           = (words, "", "")
+            gop c (words, acc, next@(h2:t2)) = if c == h2 then gop c (words ++ [acc], "", t2) else gop c (words, acc ++ [h2], t2)
 
---ex1 :: Kanji
 
