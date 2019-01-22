@@ -12,13 +12,19 @@
 module Lib where
    
 import Data.Time (UTCTime)
-import Servant.API
+import Servant
+import Servant.API 
+import Servant.Server
 import Data.Aeson hiding (json)
+import Data.Aeson.Types
 import Data.Monoid ((<>))
 import Data.Text (Text, pack, unpack)
+import Text.Pretty.Simple (pPrint)
 import GHC.Generics
 import Control.Monad.IO.Class
 import Database.PostgreSQL.Simple
+import Network.Wai
+import Network.Wai.Handler.Warp
 
 type KanjiAPI = "kanjis" :> Get '[JSON] [Kanji]
 
@@ -54,8 +60,30 @@ instance FromJSON Kanji where
         nanori <- bling <$> o .: "nanori"
         return Kanji{..} 
 
+instance ToRow Kanji
+instance FromRow Kanji
+
+-- App --
+-- app :: IO ()
+-- app = do
+--     kanjis <- getKanjis 
+--     pPrint (toJSON <$> kanjis)
+main' :: IO ()
+main' = run 8080 app
+
+app :: Application
+app = serve kanjiAPI server1
+
+server1 :: Server KanjiAPI
+server1 = do
+    kanjis <- liftIO getKanjis
+    return kanjis
+
+kanjiAPI :: Proxy KanjiAPI
+kanjiAPI = Proxy
+
 -- Get Kanjis from database
-getKanjis :: IO ()
+getKanjis :: IO [Kanji]
 getKanjis = do
     secret <- readFile "secret.txt"
     conn <- connect defaultConnectInfo {
@@ -64,10 +92,8 @@ getKanjis = do
         connectPassword = secret,
         connectDatabase = "kanjidb"
     }
-    return ()
-
-
-
+    kanjis <- (query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from testTbl") -- don't need parentheses!!
+    return kanjis
 
 -- Helper Functions --
 bling :: [Text] -> Text

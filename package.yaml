@@ -24,10 +24,13 @@ dependencies:
 - aeson
 - text
 - servant
+- servant-server
 - Spock
 - postgresql-simple
 - time
 - wai
+- warp
+- pretty-simple
 
 library:
   source-dirs: src
