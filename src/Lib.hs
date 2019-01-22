@@ -2,8 +2,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
-module Lib (app) where
+module Lib where
    
 import Data.Time (UTCTime)
 import Servant.API
@@ -13,6 +19,8 @@ import Data.Text (Text, pack, unpack)
 import GHC.Generics
 import Control.Monad.IO.Class
 import Database.PostgreSQL.Simple
+
+type KanjiAPI = "kanjis" :> Get '[JSON] [Kanji]
 
 -- Kanji Data Type --
 data Kanji = Kanji {
@@ -45,9 +53,6 @@ instance FromJSON Kanji where
         def <- bling <$> o .: "def"
         nanori <- bling <$> o .: "nanori"
         return Kanji{..} 
-
-app :: Api
-app = undefined
 
 -- Helper Functions --
 bling :: [Text] -> Text

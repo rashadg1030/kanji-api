@@ -26,6 +26,9 @@ dependencies:
 - servant
 - Spock
 - postgresql-simple
+- time
+- wai
+- http
 
 library:
   source-dirs: src
