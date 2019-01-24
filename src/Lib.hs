@@ -83,9 +83,9 @@ instance FromRow Kanji
 
 type KanjiAPI = Endpoint1 :<|> Endpoint2 :<|> Endpoint3
 
-type Endpoint1 = "kanji" :> Get '[PlainText] Text 
-type Endpoint2 = "kanji" :> Capture "id" Int :> Get '[PlainText] Text
-type Endpoint3 = "kanji" :> "yomi" :> QueryParam "on" Text :> QueryParam "kun" Text :> Get '[PlainText] Text
+type Endpoint1 = "kanji" :> Get '[JSON] [Text]
+type Endpoint2 = "kanji" :> Capture "id" Int :> Get '[JSON] [Text]
+type Endpoint3 = "kanji" :> "yomi" :> QueryParam "on" Text :> QueryParam "kun" Text :> Get '[JSON] Text
     
 kanjiAPI :: Proxy KanjiAPI
 kanjiAPI = Proxy
@@ -94,14 +94,17 @@ server :: Server KanjiAPI
 server = getAllKanji :<|> getKanjiById :<|> getKanjiByYomi
 
 -- Handlers --
-getAllKanji :: Handler Text
-getAllKanji = return "endpoint1"
+getAllKanji :: Handler [Text]
+getAllKanji = liftIO $ fetchLiteral
 
-getKanjiById :: Int -> Handler Text
-getKanjiById = return . pack . show
+getKanjiById :: Int -> Handler [Text]
+getKanjiById i = do
+    conn <- liftIO connectDb
+    literals <- liftIO $ query conn "select literal from testTbl where id=?" [i]
+    return $ join literals
 
 getKanjiByYomi :: Maybe Text -> Maybe Text -> Handler Text
-getKanjiByYomi (Just jaon) Nothing      = return "jaonfilter" 
+getKanjiByYomi (Just jaon) Nothing      = return "jaonfilter"
 getKanjiByYomi Nothing     (Just jakun) = return "jakunfilter" 
 getKanjiByYomi (Just jaon) (Just jakun) = return "doublefilt"
 getKanjiByYomi _ _                      = return "Nothing"
