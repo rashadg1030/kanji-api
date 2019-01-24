@@ -85,7 +85,7 @@ type KanjiAPI = Endpoint1 :<|> Endpoint2 :<|> Endpoint3
 
 type Endpoint1 = "kanji" :> Get '[JSON] [Text]
 type Endpoint2 = "kanji" :> Capture "id" Int :> Get '[JSON] [Text]
-type Endpoint3 = "kanji" :> "yomi" :> QueryParam "on" Text :> QueryParam "kun" Text :> Get '[JSON] Text
+type Endpoint3 = "kanji" :> "yomi" :> QueryParam "on" Text :> QueryParam "kun" Text :> Get '[JSON] [Text]
     
 kanjiAPI :: Proxy KanjiAPI
 kanjiAPI = Proxy
@@ -100,14 +100,20 @@ getAllKanji = liftIO $ fetchLiteral
 getKanjiById :: Int -> Handler [Text]
 getKanjiById i = do
     conn <- liftIO connectDb
-    literals <- liftIO $ query conn "select literal from testTbl where id=?" [i]
+    literals <- liftIO $ query conn "select literal from kanjiTbl where id=?" [i]
     return $ join literals
 
-getKanjiByYomi :: Maybe Text -> Maybe Text -> Handler Text
-getKanjiByYomi (Just jaon) Nothing      = return "jaonfilter"
-getKanjiByYomi Nothing     (Just jakun) = return "jakunfilter" 
-getKanjiByYomi (Just jaon) (Just jakun) = return "doublefilt"
-getKanjiByYomi _ _                      = return "Nothing"
+getKanjiByYomi :: Maybe Text -> Maybe Text -> Handler [Text]
+getKanjiByYomi (Just jaon) Nothing      = do
+    details <- liftIO fetchDetail
+    return $ (literal <$>) . (filter (hasJaOn jaon)) $ details
+getKanjiByYomi Nothing     (Just jakun) = do
+    details <- liftIO fetchDetail
+    return $ (literal <$>) . (filter (hasJaKun jakun)) $ details
+getKanjiByYomi (Just jaon) (Just jakun) = do
+    details <- liftIO fetchDetail
+    return $ (literal <$>) . (filter (hasJaKun jakun)) . (filter (hasJaOn jaon)) $ details
+getKanjiByYomi _ _                      = return []
 
 -- Main --
 main' :: IO ()
@@ -136,13 +142,13 @@ connectDb = do
 fetchLiteral :: IO [Text] 
 fetchLiteral = do
     conn <- connectDb
-    literals <- query_ conn "select literal from testTbl"
+    literals <- query_ conn "select literal from kanjiTbl"
     return $ join literals -- Must be double list because postgresql-simple can't infer the type or something
 
 fetchDetail :: IO [Kanji]
 fetchDetail = do
     conn <- connectDb
-    details <- query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from testTbl"
+    details <- query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from kanjiTbl"
     return details
             
 hasJaOn :: Text -> Kanji -> Bool
