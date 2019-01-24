@@ -11,6 +11,7 @@
 
 module Lib where
    
+import Control.Monad 
 import Data.Time (UTCTime)
 import Servant
 import Servant.API 
@@ -31,23 +32,23 @@ import Prelude hiding (takeWhile)
 -- Kanji Data Type --
 
 data Kanji = Kanji {
-    literal :: Text, -- literal characterlocalhost
-    grade :: Int, -- grade of the kanji
-    strokes :: Int, -- strokes needed to write kanji
-    jaOn :: Text, -- "onyomi" of the kanji
-    jaKun :: Text, -- "kunyomi" of the kanji
-    def :: Text, -- definitions of the kanji
-    nanori :: Text -- readings of the kanji used in names
+    literal :: Text, 
+    grade :: Int, 
+    strokes :: Int, 
+    jaon :: Text, 
+    jakun :: Text,
+    def :: Text, 
+    nanori :: Text
 } deriving (Generic, Show)
 
 instance ToJSON Kanji where
     toJSON Kanji{..} = object [ "literal" .= literal,
                                 "grade" .= grade,
                                 "strokes" .= strokes,
-                                "jaOn" .= (strip jaOn),
-                                "jaKun" .= (strip jaKun),
-                                "def" .= (strip def),
-                                "nanori" .= (strip nanori)
+                                "jaon" .= (deserialize jaon),
+                                "jakun" .= (deserialize jakun),
+                                "def" .= (deserialize def),
+                                "nanori" .= (deserialize nanori)
                               ]
 
 instance FromJSON Kanji where 
@@ -55,55 +56,71 @@ instance FromJSON Kanji where
         literal <- o .: "literal"
         grade <- o .: "grade"
         strokes <- o .: "strokes"
-        jaOn <- bling <$> o .: "jaOn"
-        jaKun <- bling <$> o .: "jaKun"
-        def <- bling <$> o .: "def"
-        nanori <- bling <$> o .: "nanori"
+        jaon <- serialize <$> o .: "jaon"
+        jakun <- serialize <$> o .: "jakun"
+        def <- serialize <$> o .: "def"
+        nanori <- serialize <$> o .: "nanori"
         return Kanji{..} 
 
 instance ToRow Kanji
 instance FromRow Kanji
 
-type KanjiAPI = "kanjis" :> QueryParam "jaon" Text :> Get '[JSON] [Kanji] -- view a particular set of kanjis
+-- get all kanji 
+-- kanji/  
+
+-- get kanji by id
+-- kanji/:id
+
+-- get kanji by jaon
+-- kanji/yomi?on=<value>
+
+-- get kanji by jakun
+-- kanji/yomi?kun=<value>
+
+-- get kanji by jaon and jakun
+-- kanji/yomi?on=<value>&kun=<value>
+
+
+type KanjiAPI = Endpoint1 :<|> Endpoint2 :<|> Endpoint3
+
+type Endpoint1 = "kanji" :> Get '[PlainText] Text 
+type Endpoint2 = "kanji" :> Capture "id" Int :> Get '[PlainText] Text
+type Endpoint3 = "kanji" :> "yomi" :> QueryParam "on" Text :> QueryParam "kun" Text :> Get '[PlainText] Text
     
 kanjiAPI :: Proxy KanjiAPI
 kanjiAPI = Proxy
 
+server :: Server KanjiAPI
+server = getAllKanji :<|> getKanjiById :<|> getKanjiByYomi
+
+-- Handlers --
+getAllKanji :: Handler Text
+getAllKanji = return "endpoint1"
+
+getKanjiById :: Int -> Handler Text
+getKanjiById = return . pack . show
+
+getKanjiByYomi :: Maybe Text -> Maybe Text -> Handler Text
+getKanjiByYomi (Just jaon) Nothing      = return "jaonfilter" 
+getKanjiByYomi Nothing     (Just jakun) = return "jakunfilter" 
+getKanjiByYomi (Just jaon) (Just jakun) = return "doublefilt"
+getKanjiByYomi _ _                      = return "Nothing"
+
+-- Main --
 main' :: IO ()
 main' = run 8080 app
 
 app :: Application
 app = serve kanjiAPI server
 
-server :: Server KanjiAPI
-server = handler2
-
--- handler1 :: Handler [Kanji]
--- handler1 = liftIO getKanjis
-
-handler2 :: Maybe Text -> Handler [Kanji]
-handler2 mtext = case mtext of 
-    Nothing     -> liftIO $ getKanjis
-    (Just jaon) -> do
-        kanjis <- liftIO $ getKanjis 
-        return $ (filter (hasJaOn jaon) kanjis)  
-
 tst :: IO ()
-tst = do
-    kanjis <- getKanjis
-    let flt = filter (hasJaOn "ア") kanjis
-    pPrint flt 
-
-hasJaOn :: Text -> Kanji -> Bool
-hasJaOn t = elem t . (noOkuri <$>) . strip . jaOn
-
-noOkuri :: Text -> Text
-noOkuri "" = ""
-noOkuri t  = takeWhile ('.'/=) t
+tst = do 
+    res <- fetchLiteral
+    pPrint res
 
 -- Get Kanjis from database
-getKanjis :: IO [Kanji]
-getKanjis = do
+connectDb :: IO Connection
+connectDb = do
     secret <- readFile "secret.txt"
     conn <- connect defaultConnectInfo {
         connectHost = "kanjidb.postgres.database.azure.com",
@@ -111,26 +128,46 @@ getKanjis = do
         connectPassword = secret,
         connectDatabase = "kanjidb"
     }
-    kanjis <- (query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from kanjiTbl") -- don't need parentheses!!
-    return kanjis
+    return conn  
+
+fetchLiteral :: IO [Text] 
+fetchLiteral = do
+    conn <- connectDb
+    literals <- query_ conn "select literal from testTbl"
+    return $ join literals -- Must be double list because postgresql-simple can't infer the type or something
+
+fetchDetail :: IO [Kanji]
+fetchDetail = do
+    conn <- connectDb
+    details <- query_ conn "select literal, grade, strokes, jaon, jakun, def, nanori from testTbl"
+    return details
+            
+hasJaOn :: Text -> Kanji -> Bool
+hasJaOn t = elem t . (noOkuri <$>) . deserialize . jaon
+
+hasJaKun :: Text -> Kanji -> Bool
+hasJaKun t = elem t . (noOkuri <$>) . deserialize . jakun
+
+noOkuri :: Text -> Text
+noOkuri "" = ""
+noOkuri t  = takeWhile ('.'/=) t
 
 -- Helper Functions --
-bling :: [Text] -> Text
-bling []     = ""
-bling (x:xs) = x <> "|" <> bling xs
+serialize :: [Text] -> Text
+serialize []     = ""
+serialize (x:xs) = x <> "|" <> serialize xs
 
-strip :: Text -> [Text]
-strip = (pack <$>) . (splitWhere '|') . unpack
-        where
-            splitWhere :: Char -> String -> [String]
-            splitWhere _ "" = []
-            splitWhere c s = first' $ gop c ([], "", s)
+deserialize :: Text -> [Text]
+deserialize = (pack <$>) . groupAt . unpack
+    where
+        groupAt :: String -> [String]
+        groupAt s = firstOfThree $ buildWordList '|' ([], "", s)
 
-            first' :: (a, b, c) -> a
-            first' (x, _, _) = x
+        firstOfThree :: (a, b, c) -> a
+        firstOfThree (x, _, _) = x
 
-            gop :: Char -> ([String], String, String) -> ([String], String, String)
-            gop c (words, acc, "")           = (words, "", "")
-            gop c (words, acc, next@(h2:t2)) = if c == h2 then gop c (words ++ [acc], "", t2) else gop c (words, acc ++ [h2], t2)
+        buildWordList :: Char -> ([String], String, String) -> ([String], String, String)
+        buildWordList c (words, acc, "")           = (words, "", "")
+        buildWordList c (words, acc, next@(h2:t2)) = if c == h2 then buildWordList c (words ++ [acc], "", t2) else buildWordList c (words, acc ++ [h2], t2)
 
 
