@@ -80,7 +80,6 @@ instance FromRow Kanji
 -- get kanji by jaon and jakun
 -- kanji/yomi?on=<value>&kun=<value>
 
-
 type KanjiAPI = Endpoint1 :<|> Endpoint2 :<|> Endpoint3
 
 type Endpoint1 = "kanji" :> Get '[JSON] [Text]
@@ -116,8 +115,8 @@ getKanjiByYomi (Just jaon) (Just jakun) = do
 getKanjiByYomi _ _                      = return []
 
 -- Main --
-main' :: IO ()
-main' = run 8080 app
+runServer :: IO ()
+runServer = run 8080 app
 
 app :: Application
 app = serve kanjiAPI server
@@ -128,6 +127,7 @@ tst = do
     pPrint res
 
 -- Get Kanjis from database
+-- Use ReaderT for db connection
 connectDb :: IO Connection
 connectDb = do
     secret <- readFile "secret.txt"
