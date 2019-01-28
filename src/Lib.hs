@@ -30,7 +30,6 @@ import GHC.TypeLits
 import Prelude hiding (takeWhile)
 
 -- Kanji Data Type --
-
 data Kanji = Kanji {
     literal :: Text, 
     grade :: Int, 
